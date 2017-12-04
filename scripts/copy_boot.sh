@@ -1,32 +1,41 @@
 #!/bin/bash
 
-MACHINE=raspberrypi2
+KERNEL_IMAGETYPE=zImage
 
-BOOTLDRFILES="bcm2835-bootfiles-20151021.stamp \
-              bootcode.bin \
+if [ -z "${MACHINE}" ]; then
+	echo "Environment variable MACHINE not set"
+	echo "Example: export MACHINE=raspberrypi2 or export MACHINE=raspberrypi"
+	exit 1
+fi
+
+case "${MACHINE}" in
+	raspberrypi|raspberrypi0|raspberrypi0-wifi|raspberrypi-cm)
+		DTBS="bcm2708-rpi-0-w.dtb \
+		      bcm2708-rpi-b.dtb \
+		      bcm2708-rpi-b-plus.dtb \
+		      bcm2708-rpi-cm.dtb"
+		;;
+	raspberrypi2|raspberrypi3|raspberrypi-cm3)
+		DTBS="bcm2709-rpi-2-b.dtb \
+		      bcm2710-rpi-3-b.dtb \
+		      bcm2710-rpi-cm3.dtb"
+		;;
+	*)
+		echo "Invalid MACHINE: ${MACHINE}"
+		exit 1
+esac
+
+BOOTLDRFILES="bootcode.bin \
               cmdline.txt \
               config.txt \
               fixup_cd.dat \
+              fixup.dat \
               fixup_db.dat \
               fixup_x.dat \
               start_cd.elf \
               start_db.elf \
               start.elf \
               start_x.elf"
-
-OVERLAYDTBS="hifiberry-amp-overlay.dtb \
-             hifiberry-dac-overlay.dtb \
-             hifiberry-dacplus-overlay.dtb \
-             i2c-rtc-overlay.dtb \
-             iqaudio-dac-overlay.dtb \
-             iqaudio-dacplus-overlay.dtb \
-             lirc-rpi-overlay.dtb \
-             pps-gpio-overlay.dtb \
-             w1-gpio-overlay.dtb \
-             w1-gpio-pullup-overlay.dtb"
-
-KERNELFILES="Image \
-             Image-bcm2709-rpi-2-b.dtb"
 
 if [ "x${1}" = "x" ]; then
 	echo -e "\nUsage: ${0} <block device>\n"
@@ -59,28 +68,31 @@ for f in ${BOOTLDRFILES}; do
 	fi
 done
 
-for f in ${OVERLAYDTBS}; do
-	if [ ! -f ${SRCDIR}/Image-${f} ]; then
-		echo "Overlay dtb not found: ${SRCDIR}/Image-${f}"
+for f in ${DTBS}; do
+	if [ ! -f ${SRCDIR}/${KERNEL_IMAGETYPE}-${f} ]; then
+		echo "dtb not found: ${SRCDIR}/${KERNEL_IMAGETYPE}-${f}"
 		exit 1
 	fi
 done
 	
-if [ ! -f ${SRCDIR}/Image ]; then
-	echo "Kernel file not found: ${SRCDIR}/Image"
+if [ ! -f ${SRCDIR}/${KERNEL_IMAGETYPE} ]; then
+	echo "Kernel file not found: ${SRCDIR}/${KERNEL_IMAGETYPE}"
 	exit 1
 fi
 
-if [ ! -f ${SRCDIR}/Image-bcm2709-rpi-2-b.dtb ]; then
-	echo "DTB file not found: ${SRCDIR}/Image-bcm2709-rpi-2-b.dtb"
-	exit 1
-fi
+if [ -b ${1} ]; then
+	DEV=${1}
+else
+	DEV=/dev/${1}1
 
-DEV=/dev/${1}1
+	if [ ! -b ${DEV} ]; then
+		DEV=/dev/${1}p1
 
-if [ ! -b ${DEV} ]; then
-	echo -e "\nBlock device not found: ${DEV}\n"
-	exit 1
+		if [ ! -b ${DEV} ]; then
+			echo "Block device not found: /dev/${1}1 or /dev/${1}p1"
+			exit 1
+		fi
+	fi
 fi
 
 echo "Formatting FAT partition on ${DEV}"
@@ -89,18 +101,21 @@ sudo mkfs.vfat -F 32 ${DEV} -n BOOT
 echo "Mounting ${DEV}"
 sudo mount ${DEV} /media/card
 
+if [ "$?" -ne 0 ]; then
+	echo "Error mounting ${DEV} at /media/card"
+	exit 1
+fi
+
 echo "Copying bootloader files"
-for f in ${BOOTLDRFILES}; do
-	sudo cp ${SRCDIR}/bcm2835-bootfiles/${f} /media/card
+sudo cp ${SRCDIR}/bcm2835-bootfiles/* /media/card
 
-	if [ $? -ne 0 ]; then
-		echo "Error copying ${f}"
-		sudo umount ${DEV}
-		exit 1
-	fi
-done
+if [ $? -ne 0 ]; then
+	echo "Error copying bootloader files"
+	sudo umount ${DEV}
+	exit 1
+fi
 
-echo "Copying overlay dtbs"
+echo "Creating overlay directory"
 sudo mkdir /media/card/overlays
 
 if [ $? -ne 0 ]; then
@@ -109,33 +124,99 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-echo "Copying overlay dtbs"
-for f in ${OVERLAYDTBS}; do
-	sudo cp ${SRCDIR}/Image-${f} /media/card/overlays/${f}
+echo "Copying overlay dtbos"
+for f in ${SRCDIR}/${KERNEL_IMAGETYPE}-*.dtbo; do
+	if [ -L $f ]; then
+		sudo cp $f /media/card/overlays
+	fi
+done
+
+if [ $? -ne 0 ]; then
+	echo "Error copying overlays"
+	sudo umount ${DEV}
+	exit 1
+fi
+
+echo "Stripping ${KERNEL_IMAGETYPE}- from overlay dtbos"
+case "${KERNEL_IMAGETYPE}" in
+	Image)
+		sudo rename 's/Image-([\w\-]+).dtbo/$1.dtbo/' /media/card/overlays/*.dtbo
+		;;
+	zImage)
+		sudo rename 's/zImage-([\w\-]+).dtbo/$1.dtbo/' /media/card/overlays/*.dtbo
+		;;
+	uImage)
+		sudo rename 's/zImage-([\w\-]+).dtbo/$1.dtbo/' /media/card/overlays/*.dtbo
+		;;
+esac
+
+if [ $? -ne 0 ]; then
+	echo "Error stripping overlays"
+	sudo umount ${DEV}
+	exit 1
+fi
+
+echo "Copying dtbs"
+for f in ${DTBS}; do
+	sudo cp ${SRCDIR}/${KERNEL_IMAGETYPE}-${f} /media/card/${f}
 
 	if [ $? -ne 0 ]; then
-		echo "Error copying $f"
+		echo "Error copying dtb: $f"
 		sudo umount ${DEV}
 		exit 1
 	fi
 done
 
+#echo "Copying kernel"
+#case "${MACHINE}" in
+#	raspberrypi|raspberrypi0|raspberrypi0-wifi|raspberrypi-cm)
+#		sudo cp ${SRCDIR}/${KERNEL_IMAGETYPE} /media/card/kernel.img
+#		;;
+#	raspberrypi2|raspberrypi3|raspberrypi-cm3)
+#		sudo cp ${SRCDIR}/${KERNEL_IMAGETYPE} /media/card/kernel7.img
+#		;;
+#esac
+
 echo "Copying kernel"
-sudo cp ${SRCDIR}/Image /media/card/kernel7.img
+sudo cp ${SRCDIR}/${KERNEL_IMAGETYPE} /media/card/${KERNEL_IMAGETYPE}
 
 if [ $? -ne 0 ]; then
 	echo "Error copying kernel"
 	sudo umount ${DEV}
 	exit 1
 fi
- 
-echo "Copying rpi2 dtb"
-sudo cp ${SRCDIR}/Image-bcm2709-rpi-2-b.dtb /media/card/bcm2709-rpi-2-b.dtb
 
-if [ $? -ne 0 ]; then
-	echo "Error copying rpi2 dtb"
-	sudo umount ${DEV}
-	exit 1
+if [ -f ${SRCDIR}/u-boot.bin ]; then
+	echo "Copying u-boot.bin to card"
+	sudo cp ${SRCDIR}/u-boot.bin /media/card
+
+	if [ $? -ne 0 ]; then
+		echo "Error copying u-boot"
+		sudo umount ${DEV}
+		exit 1
+	fi
+fi
+
+if [ -f ./config.txt ]; then
+	echo "Copying local config.txt to card"
+	sudo cp ./config.txt /media/card
+
+	if [ $? -ne 0 ]; then
+		echo "Error copying local config.txt to card"
+		sudo umount ${DEV}
+		exit 1
+	fi
+fi
+  
+if [ -f ./cmdline.txt ]; then
+	echo "Copying local cmdline.txt to card"
+	sudo cp ./cmdline.txt /media/card
+
+	if [ $? -ne 0 ]; then
+		echo "Error copying local cmdline.txt to card"
+		sudo umount ${DEV}
+		exit 1
+	fi
 fi
 
 echo "Unmounting ${DEV}"

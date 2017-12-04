@@ -7,28 +7,21 @@ IMAGE_LINGUAS = "en-us"
 
 inherit core-image
 
-SPLASH = "psplash-raspberrypi"
+DEPENDS += "bcm2835-bootfiles"
 
 CORE_OS = " \
     openssh openssh-keygen openssh-sftp-server \
     term-prompt \
     tzdata \
- "
-
-KERNEL_EXTRA_INSTALL = " \
-    kernel-modules \
- "
+"
 
 WIFI_SUPPORT = " \
     crda \
     iw \
-    linux-firmware-ralink \
-    linux-firmware-rtl8192ce \
-    linux-firmware-rtl8192cu \
-    linux-firmware-rtl8192su \
+    linux-firmware-bcm43430 \
     wireless-tools \
     wpa-supplicant \
- "
+"
 
 DEV_SDK_INSTALL = " \
     binutils \
@@ -38,10 +31,12 @@ DEV_SDK_INSTALL = " \
     cpp-symlinks \
     diffutils \
     file \
-    gcc \
-    gcc-symlinks \
     g++ \
     g++-symlinks \
+    gcc \
+    gcc-symlinks \
+    gdb \
+    gdbserver \
     gettext \
     git \
     ldd \
@@ -49,62 +44,55 @@ DEV_SDK_INSTALL = " \
     libstdc++-dev \
     libtool \
     make \
-    perl-modules \
     pkgconfig \
-    python-modules \
- "
+    python3-modules \
+"
 
 DEV_EXTRAS = " \
     ntp \
     ntp-tickadj \
-    serialecho \
+    serialecho  \
     spiloop \
-    zeromq \
-    zeromq-dev \
- "
+"
 
 EXTRA_TOOLS_INSTALL = " \
-    bc \
     bzip2 \
     devmem2 \
     dosfstools \
     ethtool \
+    fbset \
     findutils \
+    firewall \
     i2c-tools \
-    iftop \
-    iperf \
-    htop \
+    iperf3 \
+    iproute2 \
+    iptables \
     less \
     nano \
+    netcat \
     procps \
-    rsync \
     sysfsutils \
     tcpdump \
     unzip \
     util-linux \
-    vim-tiny \
     wget \
     zip \
- "
+"
 
 RPI_STUFF = " \
     omxplayer \
-    bcm2835-tests \
-    wiringpi \
-    rpio \
-    rpi-gpio \
-    pi-blaster \
- "
+    raspi2fb \
+    userland \
+"
 
 IMAGE_INSTALL += " \
     ${CORE_OS} \
     ${DEV_SDK_INSTALL} \
     ${DEV_EXTRAS} \
     ${EXTRA_TOOLS_INSTALL} \
-    ${KERNEL_EXTRA_INSTALL} \
     ${RPI_STUFF} \
     ${WIFI_SUPPORT} \
- "
+"
 
 set_local_timezone() {
     ln -sf /usr/share/zoneinfo/EST5EDT ${IMAGE_ROOTFS}/etc/localtime
