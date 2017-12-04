@@ -1,5 +1,5 @@
 SUMMARY = "A Qt5 development image"
-HOMEPAGE = "http://www.jumpnowtek.com"
+HOMEPAGE = "http://www.nkgroup.cz"
 LICENSE = "MIT"
 
 require qt5-basic-image.bb
@@ -49,10 +49,6 @@ QT5_PKGS = " \
     qtwebsockets-qmlplugins \
     qtvirtualkeyboard \
     qtxmlpatterns \
-"
-
-QML_APPS = " \
-    qqtest \
 "
 
 IMAGE_INSTALL += " \

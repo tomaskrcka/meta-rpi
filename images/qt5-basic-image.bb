@@ -2,7 +2,7 @@ SUMMARY = "A basic Qt5 qwidgets dev image"
 HOMEPAGE = "http://www.jumpnowtek.com"
 LICENSE = "MIT"
 
-require console-image.bb
+require console-image-elkamet.bb
 
 QT_DEV_TOOLS = " \
     qtbase-dev \
@@ -36,9 +36,6 @@ IMAGE_INSTALL += " \
     ${FONTS} \
     ${QT_TOOLS} \
     qcolorcheck \
-    qfontchooser \
-    qkeytest \
-    qshowfonts \
     ${TSLIB} \
     tspress \
 "
