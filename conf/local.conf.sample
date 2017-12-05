@@ -16,7 +16,7 @@ VIRTUAL-RUNTIME_init_manager = "systemd"
 
 MACHINE_FEATURES_remove = "apm"
 
-IMAGE_FSTYPES = "tar.xz"
+IMAGE_FSTYPES = "tar.xz ext3 rpi-sdimg"
 
 PREFERRED_VERSION_linux-raspberrypi = "4.9.%"
 
