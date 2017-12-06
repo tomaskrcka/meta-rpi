@@ -53,6 +53,7 @@ QT5_PKGS = " \
 
 QML_APPS = " \
     qqtest \
+    qdefectapp \
 "
 
 IMAGE_INSTALL += " \
